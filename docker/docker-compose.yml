@@ -10,16 +10,16 @@ name: supabase
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:latest
+    image: supabase/studio:2026.02.16-sha-26c615c
     restart: unless-stopped
     depends_on:
       - db
     environment:
-      HOSTNAME: "0.0.0.0"
+      HOSTNAME: "::"
       STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_PORT: 5432
       POSTGRES_HOST: db
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
@@ -48,7 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:latest
+    image: supabase/gotrue:v2.186.0
     restart: unless-stopped
     depends_on:
       db:
@@ -57,27 +57,26 @@ services:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:latest
+    image: postgrest/postgrest:v12.2.3
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:latest
+    image: supabase/realtime:v2.76.5
     restart: unless-stopped
     depends_on:
       db:
@@ -88,13 +87,12 @@ services:
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
+      DB_NAME: postgres
       API_JWT_SECRET: ${JWT_SECRET}
-      REPLICATION_MODE: RLS
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:latest
+    image: supabase/storage-api:v1.37.8
     restart: unless-stopped
     depends_on:
       db:
@@ -103,7 +101,7 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
     volumes:
@@ -111,7 +109,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:latest
+    image: supabase/postgres-meta:v0.95.2
     restart: unless-stopped
     depends_on:
       db:
@@ -121,24 +119,9 @@ services:
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
-  analytics:
-    container_name: supabase-analytics
-    image: supabase/logflare:1.31.2
-    restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      DB_USERNAME: postgres
-      DB_DATABASE: ${POSTGRES_DB}
-      DB_HOSTNAME: db
-      DB_PORT: 5432
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_BACKEND_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      LOGFLARE_SINGLE_TENANT: "true"
-
   db:
     container_name: supabase-db
-    image: supabase/postgres:15.1.1.78
+    image: supabase/postgres:15.8.1.085
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
@@ -153,5 +136,5 @@ services:
       - ./volumes/db/data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
