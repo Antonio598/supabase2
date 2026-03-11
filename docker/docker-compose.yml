@@ -29,7 +29,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
 
-  # --- API GATEWAY ---
+  # --- API GATEWAY (KONG) ---
   kong:
     container_name: supabase-kong
     image: kong:2.8.1
@@ -46,56 +46,32 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
-  # --- AUTENTICACIÓN ---
-  auth:
-    container_name: supabase-auth
-    image: supabase/auth:v2.161.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      GOTRUE_API_PORT: 9999
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
-      GOTRUE_SITE_URL: ${SITE_URL}
-      GOTRUE_JWT_EXP: ${JWT_EXPIRY}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET}
-
-  # --- REST API ---
-  rest:
-    container_name: supabase-rest
-    image: postgrest/postgrest:v12.2.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
-      PGRST_JWT_SECRET: ${JWT_SECRET}
-
-  # --- DASHBOARD (Studio) ---
+  # --- DASHBOARD (Studio) - AQUÍ ESTÁ EL FIX ---
   studio:
     container_name: supabase-studio
     image: supabase/studio:latest
     restart: unless-stopped
     depends_on:
       - db
+      - meta
     environment:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PORT: 5432
+      # NUEVO: Studio ahora requiere estas 3 variables explícitas para el SQL Editor
       POSTGRES_HOST: db
-      POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      # ---
       PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      # FALLBACKS para evitar el error 'undefined'
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-Synexia}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-Default}
 
   # --- POSTGRES META ---
   meta:
@@ -109,3 +85,6 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_SCHEMA: public
