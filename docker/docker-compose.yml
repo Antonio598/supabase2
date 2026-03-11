@@ -5,17 +5,18 @@
 #   Destroy:            docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml down -v --remove-orphans
 #   Reset everything:  ./reset.sh
 
-name: supabase
+version: '3.8'
 
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:20250127-66a9829
+    image: supabase/studio:20240124-8178652
     restart: unless-stopped
     depends_on:
       - db
+      - analytics
     environment:
-      HOSTNAME: "::"
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_HOST: db
@@ -39,9 +40,9 @@ services:
     restart: unless-stopped
     ports:
       - ${KONG_HTTP_PORT}:8000
+      - ${KONG_HTTPS_PORT}:8443
     volumes:
-      - ./volumes/api/kong.yml:/home/kong/temp.yml:ro
-    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
+      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
@@ -52,7 +53,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:v2.161.0
+    image: supabase/gotrue:v2.143.0
     restart: unless-stopped
     depends_on:
       db:
@@ -61,27 +62,28 @@ services:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
       GOTRUE_SITE_URL: ${SITE_URL}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM}
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:v12.0.2
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.33.40
+    image: supabase/realtime:v2.28.16
     restart: unless-stopped
     depends_on:
       db:
@@ -90,15 +92,16 @@ services:
       PORT: 4000
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: supabase_admin
+      DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       API_JWT_SECRET: ${JWT_SECRET}
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      REPLICATION_MODE: RLS
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v1.1.2
+    image: supabase/storage-api:v0.48.0
     restart: unless-stopped
     depends_on:
       db:
@@ -107,7 +110,8 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
     volumes:
@@ -115,7 +119,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:v0.84.2
+    image: supabase/postgres-meta:v0.80.0
     restart: unless-stopped
     depends_on:
       db:
@@ -124,8 +128,16 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      PG_META_DB_NAME: ${POSTGRES_DB}
-      PG_META_DB_USER: supabase_admin
+
+  functions:
+    container_name: supabase-edge-runtime
+    image: supabase/edge-runtime:v1.32.4
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
 
   analytics:
     container_name: supabase-analytics
@@ -134,13 +146,14 @@ services:
     depends_on:
       - db
     environment:
-      DB_USERNAME: supabase_admin
-      DB_DATABASE: _supabase
+      LOGFLARE_NODE_HOST: 0.0.0.0
+      DB_USERNAME: postgres
+      DB_DATABASE: ${POSTGRES_DB}
       DB_HOSTNAME: db
       DB_PORT: 5432
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_BACKEND_URL: postgresql://supabase_admin:${POSTGRES_PASSWORD}@db:5432/_supabase
-      LOGFLARE_SINGLE_TENANT: true
+      POSTGRES_BACKEND_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      LOGFLARE_SINGLE_TENANT: "true"
 
   db:
     container_name: supabase-db
@@ -148,14 +161,16 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     volumes:
-      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/99-realtime.sql
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql
-      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./volumes/db/schema.sql:/docker-entrypoint-initdb.d/03-schema.sql
       - ./volumes/db/data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
