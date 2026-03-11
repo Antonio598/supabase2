@@ -60,6 +60,9 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
+    volumes:
+      - ./volumes/studio/snippets:/etc/studio/snippets
 
   meta:
     image: supabase/postgres-meta:v0.84.2
