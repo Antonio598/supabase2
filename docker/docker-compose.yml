@@ -76,15 +76,18 @@ services:
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
-  # --- DASHBOARD (Studio) ---
+ # --- DASHBOARD (Studio) ---
   studio:
     container_name: supabase-studio
-    image: supabase/studio:latest
+    # Usamos una versión específica estable en lugar de latest
+    image: supabase/studio:20250127-66a9829 
     restart: unless-stopped
     depends_on:
       - db
+      - meta
     environment:
       HOSTNAME: "0.0.0.0"
+      # Verificamos que apunte correctamente al contenedor meta
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: 5432
       POSTGRES_HOST: db
@@ -97,9 +100,10 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
-  # --- POSTGRES META ---
+  # --- POSTGRES META (El traductor) ---
   meta:
     container_name: supabase-meta
+    # Subimos a la versión que hace match con el Studio de arriba
     image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
     depends_on:
@@ -109,3 +113,5 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
