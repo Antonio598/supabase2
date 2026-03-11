@@ -8,7 +8,7 @@
 name: supabase
 
 services:
-  # --- BASE DE DATOS (El corazón del sistema) ---
+  # --- BASE DE DATOS ---
   db:
     container_name: supabase-db
     image: supabase/postgres:15.1.1.78
@@ -17,8 +17,8 @@ services:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
       interval: 10s
       timeout: 10s
-      retries: 20          # Le damos 20 intentos...
-      start_period: 60s    # ...y 1 minuto de "gracia" inicial para procesar los SQL
+      retries: 20
+      start_period: 60s
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
@@ -63,7 +63,7 @@ services:
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
 
-  # --- REST API (PostgREST) ---
+  # --- REST API ---
   rest:
     container_name: supabase-rest
     image: postgrest/postgrest:v12.2.0
@@ -76,18 +76,15 @@ services:
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
- # --- DASHBOARD (Studio) ---
+  # --- DASHBOARD (Studio) ---
   studio:
     container_name: supabase-studio
-    # Usamos una versión específica estable en lugar de latest
-    image: supabase/studio:20250127-66a9829 
+    image: supabase/studio:latest
     restart: unless-stopped
     depends_on:
       - db
-      - meta
     environment:
       HOSTNAME: "0.0.0.0"
-      # Verificamos que apunte correctamente al contenedor meta
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: 5432
       POSTGRES_HOST: db
@@ -100,10 +97,9 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
-  # --- POSTGRES META (El traductor) ---
+  # --- POSTGRES META ---
   meta:
     container_name: supabase-meta
-    # Subimos a la versión que hace match con el Studio de arriba
     image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
     depends_on:
@@ -113,5 +109,3 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      PG_META_DB_NAME: postgres
-      PG_META_DB_USER: postgres
