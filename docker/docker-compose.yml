@@ -10,12 +10,12 @@ name: supabase
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:2026.02.16-sha-26c615c
+    image: supabase/studio:20240124-8178652
     restart: unless-stopped
     depends_on:
       - db
     environment:
-      HOSTNAME: "::"
+      HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PORT: 5432
       POSTGRES_HOST: db
@@ -35,7 +35,7 @@ services:
     image: kong:2.8.1
     restart: unless-stopped
     ports:
-      - ${KONG_HTTP_PORT}:8000
+      - ${KONG_HTTP_PORT:-8000}:8000
     volumes:
       - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
@@ -48,7 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:v2.186.0
+    image: supabase/gotrue:v2.143.0
     restart: unless-stopped
     depends_on:
       db:
@@ -64,7 +64,7 @@ services:
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:v12.2.3
+    image: postgrest/postgrest:v12.0.2
     restart: unless-stopped
     depends_on:
       db:
@@ -76,7 +76,7 @@ services:
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.76.5
+    image: supabase/realtime:v2.28.16
     restart: unless-stopped
     depends_on:
       db:
@@ -92,7 +92,7 @@ services:
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v1.37.8
+    image: supabase/storage-api:v0.48.0
     restart: unless-stopped
     depends_on:
       db:
@@ -109,7 +109,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:v0.95.2
+    image: supabase/postgres-meta:v0.80.0
     restart: unless-stopped
     depends_on:
       db:
@@ -121,13 +121,14 @@ services:
 
   db:
     container_name: supabase-db
-    image: supabase/postgres:15.8.1.085
+    image: supabase/postgres:15.1.1.78
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 15
+      start_period: 30s
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
@@ -137,4 +138,3 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
