@@ -8,28 +8,28 @@
 name: supabase
 
 services:
-  studio:
-    container_name: supabase-studio
-    image: supabase/studio:latest
+  # --- BASE DE DATOS (El corazón del sistema) ---
+  db:
+    container_name: supabase-db
+    image: supabase/postgres:15.1.1.78
     restart: unless-stopped
-    depends_on:
-      - db
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 20          # Le damos 20 intentos...
+      start_period: 60s    # ...y 1 minuto de "gracia" inicial para procesar los SQL
+    volumes:
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      - ./volumes/db/schema.sql:/docker-entrypoint-initdb.d/03-schema.sql
+      - ./volumes/db/data:/var/lib/postgresql/data
     environment:
-      HOSTNAME: "0.0.0.0"
-      STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PORT: 5432
-      POSTGRES_HOST: db
-      POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
-      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
-      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT}
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-      AUTH_JWT_SECRET: ${JWT_SECRET}
+      POSTGRES_DB: postgres
 
+  # --- API GATEWAY ---
   kong:
     container_name: supabase-kong
     image: kong:2.8.1
@@ -46,6 +46,7 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
+  # --- AUTENTICACIÓN ---
   auth:
     container_name: supabase-auth
     image: supabase/auth:v2.161.0
@@ -62,6 +63,7 @@ services:
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
 
+  # --- REST API (PostgREST) ---
   rest:
     container_name: supabase-rest
     image: postgrest/postgrest:v12.2.0
@@ -74,40 +76,28 @@ services:
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
-  realtime:
-    container_name: supabase-realtime
-    image: supabase/realtime:v2.33.40
+  # --- DASHBOARD (Studio) ---
+  studio:
+    container_name: supabase-studio
+    image: supabase/studio:latest
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     environment:
-      PORT: 4000
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: postgres
-      API_JWT_SECRET: ${JWT_SECRET}
+      HOSTNAME: "0.0.0.0"
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PORT: 5432
+      POSTGRES_HOST: db
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
 
-  storage:
-    container_name: supabase-storage
-    # Usamos v0.43.10 que es la versión más estable para auto-hosting
-    image: supabase/storage-api:v0.43.10
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      ANON_KEY: ${ANON_KEY}
-      SERVICE_KEY: ${SERVICE_ROLE_KEY}
-      PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      STORAGE_BACKEND: file
-      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
-    volumes:
-      - ./volumes/storage:/var/lib/storage
-
+  # --- POSTGRES META ---
   meta:
     container_name: supabase-meta
     image: supabase/postgres-meta:v0.84.2
@@ -119,23 +109,3 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-
-  db:
-    container_name: supabase-db
-    image: supabase/postgres:15.1.1.78
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 30s
-    volumes:
-      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
-      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
-      - ./volumes/db/schema.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      - ./volumes/db/data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: postgres
