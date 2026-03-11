@@ -5,23 +5,21 @@
 #   Destroy:            docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml down -v --remove-orphans
 #   Reset everything:  ./reset.sh
 
-version: '3.8'
 name: supabase
 
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:20240124-8178652
+    image: supabase/studio:latest
     restart: unless-stopped
     depends_on:
       - db
-      - analytics
     environment:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_PORT: 5432
       POSTGRES_HOST: db
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
@@ -31,9 +29,6 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-      LOGFLARE_URL: http://analytics:4000
-      NEXT_PUBLIC_ENABLE_LOGS: true
-      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
 
   kong:
     container_name: supabase-kong
@@ -53,7 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:v2.132.3
+    image: supabase/gotrue:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -62,7 +57,7 @@ services:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
@@ -71,19 +66,19 @@ services:
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:v12.0.2
+    image: postgrest/postgrest:latest
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.25.93
+    image: supabase/realtime:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -94,14 +89,14 @@ services:
       DB_PORT: 5432
       DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
+      DB_NAME: postgres
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       API_JWT_SECRET: ${JWT_SECRET}
       REPLICATION_MODE: RLS
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v0.43.10
+    image: supabase/storage-api:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -110,7 +105,7 @@ services:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
@@ -119,7 +114,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:v0.80.0
+    image: supabase/postgres-meta:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -128,27 +123,6 @@ services:
       PG_META_PORT: 8080
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-
-  analytics:
-    container_name: supabase-analytics
-    image: supabase/logflare:1.31.2
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 10s
-      timeout: 10s
-      retries: 20
-    depends_on:
-      - db
-    environment:
-      LOGFLARE_NODE_HOST: 0.0.0.0
-      DB_USERNAME: postgres
-      DB_DATABASE: ${POSTGRES_DB}
-      DB_HOSTNAME: db
-      DB_PORT: 5432
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_BACKEND_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      LOGFLARE_SINGLE_TENANT: "true"
 
   db:
     container_name: supabase-db
@@ -167,5 +141,5 @@ services:
       - ./volumes/db/data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: postgres
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
