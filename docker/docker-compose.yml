@@ -10,7 +10,7 @@ name: supabase
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:20241125-9964175
+    image: supabase/studio:20240124-8178652
     restart: unless-stopped
     depends_on:
       - db
@@ -48,7 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:v2.158.0
+    image: supabase/gotrue:v2.143.0
     restart: unless-stopped
     depends_on:
       db:
@@ -66,7 +66,7 @@ services:
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:v12.0.2
     restart: unless-stopped
     depends_on:
       db:
@@ -78,7 +78,7 @@ services:
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.30.23
+    image: supabase/realtime:v2.28.16
     restart: unless-stopped
     depends_on:
       db:
@@ -96,7 +96,7 @@ services:
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v0.53.6
+    image: supabase/storage-api:v0.48.0
     restart: unless-stopped
     depends_on:
       db:
@@ -114,7 +114,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:v0.84.2
+    image: supabase/postgres-meta:v0.80.0
     restart: unless-stopped
     depends_on:
       db:
