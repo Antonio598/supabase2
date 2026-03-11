@@ -50,7 +50,6 @@ services:
     restart: unless-stopped
     depends_on:
       - db
-      - meta
     environment:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
@@ -99,15 +98,3 @@ services:
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
-
-  rest:
-    container_name: supabase-rest
-    image: postgrest/postgrest:v12.2.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
-      PGRST_JWT_SECRET: ${JWT_SECRET}
