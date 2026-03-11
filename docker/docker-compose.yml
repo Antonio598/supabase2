@@ -5,16 +5,15 @@
 #   Destroy:            docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml down -v --remove-orphans
 #   Reset everything:  ./reset.sh
 
-version: '3.8'
+name: supabase
 
 services:
   studio:
     container_name: supabase-studio
-    image: supabase/studio:20240124-8178652
+    image: supabase/studio:latest
     restart: unless-stopped
     depends_on:
       - db
-      - analytics
     environment:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
@@ -30,9 +29,6 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-      LOGFLARE_URL: http://analytics:4000
-      NEXT_PUBLIC_ENABLE_LOGS: true
-      NEXT_ANALYTICS_BACKEND_PROVIDER: postgres
 
   kong:
     container_name: supabase-kong
@@ -40,7 +36,6 @@ services:
     restart: unless-stopped
     ports:
       - ${KONG_HTTP_PORT}:8000
-      - ${KONG_HTTPS_PORT}:8443
     volumes:
       - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
@@ -53,7 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:v2.143.0
+    image: supabase/gotrue:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -67,11 +62,10 @@ services:
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP}
-      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM}
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:v12.0.2
+    image: postgrest/postgrest:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -83,7 +77,7 @@ services:
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.28.16
+    image: supabase/realtime:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -95,13 +89,12 @@ services:
       DB_USER: postgres
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
-      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       API_JWT_SECRET: ${JWT_SECRET}
       REPLICATION_MODE: RLS
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v0.48.0
+    image: supabase/storage-api:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -111,7 +104,6 @@ services:
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       PGRST_JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
     volumes:
@@ -119,7 +111,7 @@ services:
 
   meta:
     container_name: supabase-meta
-    image: supabase/postgres-meta:v0.80.0
+    image: supabase/postgres-meta:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -129,16 +121,6 @@ services:
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
-  functions:
-    container_name: supabase-edge-runtime
-    image: supabase/edge-runtime:v1.32.4
-    restart: unless-stopped
-    environment:
-      JWT_SECRET: ${JWT_SECRET}
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-
   analytics:
     container_name: supabase-analytics
     image: supabase/logflare:1.31.2
@@ -146,7 +128,6 @@ services:
     depends_on:
       - db
     environment:
-      LOGFLARE_NODE_HOST: 0.0.0.0
       DB_USERNAME: postgres
       DB_DATABASE: ${POSTGRES_DB}
       DB_HOSTNAME: db
@@ -161,9 +142,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
