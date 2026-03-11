@@ -48,7 +48,8 @@ services:
 
   auth:
     container_name: supabase-auth
-    image: supabase/gotrue:latest
+    # CAMBIO CRÍTICO: gotrue ahora se llama auth
+    image: supabase/auth:v2.158.0
     restart: unless-stopped
     depends_on:
       db:
@@ -64,7 +65,7 @@ services:
 
   rest:
     container_name: supabase-rest
-    image: postgrest/postgrest:latest
+    image: postgrest/postgrest:v12.2.0
     restart: unless-stopped
     depends_on:
       db:
@@ -76,7 +77,7 @@ services:
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:latest
+    image: supabase/realtime:v2.30.23
     restart: unless-stopped
     depends_on:
       db:
@@ -92,7 +93,7 @@ services:
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:latest
+    image: supabase/storage-api:v0.53.6
     restart: unless-stopped
     depends_on:
       db:
@@ -119,21 +120,6 @@ services:
       PG_META_DB_HOST: db
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
-  analytics:
-    container_name: supabase-analytics
-    image: supabase/logflare:1.31.2
-    restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      DB_USERNAME: postgres
-      DB_DATABASE: postgres
-      DB_HOSTNAME: db
-      DB_PORT: 5432
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_BACKEND_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      LOGFLARE_SINGLE_TENANT: "true"
-
   db:
     container_name: supabase-db
     image: supabase/postgres:15.1.1.78
@@ -141,9 +127,8 @@ services:
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
