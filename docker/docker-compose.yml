@@ -8,12 +8,11 @@
 name: supabase
 
 services:
+  # --- BASE DE DATOS ---
   db:
     container_name: supabase-db
     image: supabase/postgres:15.1.1.78
     restart: unless-stopped
-    networks:
-      - supabase_network
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
       interval: 10s
@@ -30,12 +29,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
 
+  # --- API GATEWAY ---
   kong:
     container_name: supabase-kong
     image: kong:2.8.1
     restart: unless-stopped
-    networks:
-      - supabase_network
     ports:
       - ${KONG_HTTP_PORT:-8000}:8000
     volumes:
@@ -48,12 +46,11 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
+  # --- DASHBOARD (Studio) ---
   studio:
     container_name: supabase-studio
     image: supabase/studio:latest
     restart: unless-stopped
-    networks:
-      - supabase_network
     depends_on:
       - db
     environment:
@@ -69,16 +66,16 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      # Fix para los Snippets
       SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
     volumes:
       - ./volumes/studio/snippets:/etc/studio/snippets
 
+  # --- POSTGRES META ---
   meta:
     container_name: supabase-meta
     image: supabase/postgres-meta:v0.84.2
     restart: unless-stopped
-    networks:
-      - supabase_network
     depends_on:
       db:
         condition: service_healthy
@@ -91,12 +88,11 @@ services:
       PG_META_DB_SCHEMA: public
       PG_META_DB_SSL: "false"
 
+  # --- AUTENTICACIÓN ---
   auth:
     container_name: supabase-auth
     image: supabase/auth:v2.161.0
     restart: unless-stopped
-    networks:
-      - supabase_network
     depends_on:
       db:
         condition: service_healthy
@@ -109,12 +105,11 @@ services:
       GOTRUE_JWT_EXP: ${JWT_EXPIRY}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
 
+  # --- REST API ---
   rest:
     container_name: supabase-rest
     image: postgrest/postgrest:v12.2.0
     restart: unless-stopped
-    networks:
-      - supabase_network
     depends_on:
       db:
         condition: service_healthy
@@ -122,7 +117,3 @@ services:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-
-networks:
-  supabase_network:
-    driver: bridge
