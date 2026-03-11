@@ -48,8 +48,7 @@ services:
 
   auth:
     container_name: supabase-auth
-    # CAMBIO CRÍTICO: gotrue ahora se llama auth
-    image: supabase/auth:v2.158.0
+    image: supabase/auth:v2.161.0
     restart: unless-stopped
     depends_on:
       db:
@@ -77,7 +76,7 @@ services:
 
   realtime:
     container_name: supabase-realtime
-    image: supabase/realtime:v2.30.23
+    image: supabase/realtime:v2.33.40
     restart: unless-stopped
     depends_on:
       db:
@@ -93,7 +92,8 @@ services:
 
   storage:
     container_name: supabase-storage
-    image: supabase/storage-api:v0.53.6
+    # Usamos v0.43.10 que es la versión más estable para auto-hosting
+    image: supabase/storage-api:v0.43.10
     restart: unless-stopped
     depends_on:
       db:
@@ -128,7 +128,8 @@ services:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 30s
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
