@@ -4,7 +4,6 @@
 #   Stop:               docker compose down
 #   Destroy:            docker compose -f docker-compose.yml -f ./dev/docker-compose.dev.yml down -v --remove-orphans
 #   Reset everything:  ./reset.sh
-
 name: supabase
 
 services:
@@ -18,12 +17,12 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
+      # Mapeos optimizados: dejamos que el esquema principal corra primero
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/00-schema.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
-      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # Cambiamos a data_v11 para asegurar una instalación limpia de 0
-      - ./volumes/db/data_v11:/var/lib/postgresql/data 
+      # data_v13 asegura que tu servidor de 16GB haga una instalación limpia
+      - ./volumes/db/data_v13:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -36,9 +35,10 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      # Conexión directa para evitar fallos de resolución de DNS internos
-      PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      # Conexión por URL: es la forma más estable de evitar el error 'undefined'
+      PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
       PG_META_DB_SSL: "false"
+      PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
   studio:
     image: supabase/studio:latest
@@ -57,6 +57,32 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+
+  auth:
+    image: supabase/auth:v2.161.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+
+  rest:
+    image: postgrest/postgrest:v12.2.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_JWT_SECRET: ${JWT_SECRET}
 
   kong:
     image: kong:2.8.1
