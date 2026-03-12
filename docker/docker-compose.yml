@@ -93,6 +93,8 @@ services:
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
       PG_META_DB_NAME: postgres
       PG_META_DB_USER: postgres
+      PG_META_DB_PORT: 5432
+      PG_META_DB_SSL: "false" # <-- Esto arregla el error de comunicación API
 
   studio:
     image: supabase/studio:latest
@@ -100,6 +102,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      meta:
+        condition: service_started
     environment:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
@@ -109,9 +113,12 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
+    volumes:
+      - ./volumes/studio/snippets:/etc/studio/snippets
 
   logflare:
-    image: supabase/logflare:latest # <--- CAMBIADO A LATEST
+    image: supabase/logflare:latest
     restart: unless-stopped
     environment:
       LOGFLARE_NODE_ID: node-1
@@ -129,7 +136,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   analytics:
-    image: supabase/logflare:latest # <--- CAMBIADO A LATEST
+    image: supabase/logflare:latest
     restart: unless-stopped
     depends_on:
       vector:
