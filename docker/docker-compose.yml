@@ -22,10 +22,13 @@ services:
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      - ./volumes/db/data:/var/lib/postgresql/data
+      # CAMBIAMOS A data_v3 PARA FORZAR EL BORRADO REAL
+      - ./volumes/db/data_v3:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
+      # Parámetro extra para asegurar que los roles se gestionen bien en el primer arranque
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
 
   kong:
     image: kong:2.8.1
@@ -65,21 +68,6 @@ services:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
-
-  realtime:
-    image: supabase/realtime:v2.33.51
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: postgres
-      DB_USER: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      REPLICATION_MODE: RLS
 
   meta:
     image: supabase/postgres-meta:v0.84.2
