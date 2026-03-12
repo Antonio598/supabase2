@@ -18,17 +18,16 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
-      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
+      # Mapeos corregidos para asegurar el orden de ejecución
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # CAMBIAMOS A data_v3 PARA FORZAR EL BORRADO REAL
-      - ./volumes/db/data_v3:/var/lib/postgresql/data 
+      # data_v7 garantiza que Hostinger NO se salte la inicialización
+      - ./volumes/db/data_v7:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
-      # Parámetro extra para asegurar que los roles se gestionen bien en el primer arranque
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
 
   kong:
     image: kong:2.8.1
