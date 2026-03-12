@@ -40,7 +40,8 @@ services:
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
   studio:
-    image: supabase/studio:latest
+    # Cambiamos 'latest' por esta versión específica y estable
+    image: supabase/studio:2024.11.26-sha-8f096b5
     restart: unless-stopped
     depends_on:
       db:
@@ -56,10 +57,8 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-      # ESTA ES LA VARIABLE QUE TE PIDE
       SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
     volumes:
-      # MAPEAMOS LA CARPETA PARA QUE NO SE BORREN LOS SNIPPETS
       - ./volumes/studio/snippets:/etc/studio/snippets
   auth:
     image: supabase/auth:v2.161.0
