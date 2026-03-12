@@ -18,59 +18,16 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      # QUITAMOS el 00-roles.sql para evitar el choque
+      # ORDEN CRÍTICO: Roles primero, luego esquema
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # AÑADIMOS este para que corra al FINAL de todo
-      - ./volumes/db/fix_passwords.sql:/docker-entrypoint-initdb.d/99-passwords.sql
-      # Forzamos carpeta nueva para que no diga "Skipping initialization"
-      - ./volumes/db/data_v8:/var/lib/postgresql/data 
+      # Carpeta nueva para ignorar errores pasados
+      - ./volumes/db/data_v9:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
-
-  # ... (Resto de servicios: kong, auth, rest, meta, studio, etc. se mantienen igual)
-  # Solo asegúrate de copiar el resto del archivo que ya tenías funcional
-
-  kong:
-    image: kong:2.8.1
-    restart: unless-stopped
-    volumes:
-      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
-      KONG_DNS_ORDER: LAST,A,CNAME
-      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-
-  auth:
-    image: supabase/auth:v2.161.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      GOTRUE_API_PORT: 9999
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
-      GOTRUE_SITE_URL: ${SITE_URL}
-      GOTRUE_JWT_EXP: ${JWT_EXPIRY}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET}
-
-  rest:
-    image: postgrest/postgrest:v12.2.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
-      PGRST_JWT_SECRET: ${JWT_SECRET}
 
   meta:
     image: supabase/postgres-meta:v0.84.2
@@ -108,14 +65,16 @@ services:
     volumes:
       - ./volumes/studio/snippets:/etc/studio/snippets
 
-  logflare:
-    image: supabase/logflare:latest
+  kong:
+    image: kong:2.8.1
     restart: unless-stopped
+    volumes:
+      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
-      LOGFLARE_NODE_ID: node-1
-      LOGFLARE_SINGLE_TENANT: "true"
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
   vector:
     image: timberio/vector:0.28.1-debian
@@ -125,10 +84,3 @@ services:
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-
-  analytics:
-    image: supabase/logflare:latest
-    restart: unless-stopped
-    depends_on:
-      vector:
-        condition: service_started
