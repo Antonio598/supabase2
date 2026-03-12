@@ -56,7 +56,11 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-
+      # ESTA ES LA VARIABLE QUE TE PIDE
+      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
+    volumes:
+      # MAPEAMOS LA CARPETA PARA QUE NO SE BORREN LOS SNIPPETS
+      - ./volumes/studio/snippets:/etc/studio/snippets
   auth:
     image: supabase/auth:v2.161.0
     restart: unless-stopped
