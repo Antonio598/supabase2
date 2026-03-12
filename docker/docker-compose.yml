@@ -20,8 +20,8 @@ services:
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # data_v17 para entrar 100% limpio
-      - ./volumes/db/data_v17:/var/lib/postgresql/data 
+      # Forzamos data_v18 para que el sistema empiece desde cero absoluto
+      - ./volumes/db/data_v18:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -39,8 +39,7 @@ services:
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
   studio:
-    # ESTA VERSIÓN SÍ EXISTE (Verificada en Docker Hub)
-    image: supabase/studio:2024.11.26-sha-8f096b5
+    image: supabase/studio:latest # Usamos latest para que el Deploy no falle
     restart: unless-stopped
     depends_on:
       db:
@@ -51,18 +50,18 @@ services:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Estas 3 variables dentro de Studio son las que matan el error .includes()
+      # ESTO ES LO QUE ARREGLA EL ERROR .includes()
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      # Variables de identidad (Obligatorias para self-hosted)
+      STUDIO_DEFAULT_ORGANIZATION: "Synexia AI"
+      STUDIO_DEFAULT_PROJECT: "Funnel Project"
       SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
     volumes:
       - ./volumes/studio/snippets:/etc/studio/snippets
-
-  # ... (Resto de servicios: auth, rest, kong se mantienen igual)
-  # Solo asegúrate de que el resto del archivo esté ahí
 
   auth:
     image: supabase/auth:v2.161.0
@@ -79,17 +78,6 @@ services:
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_EXP: 3600
 
-  rest:
-    image: postgrest/postgrest:v12.2.0
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      PGRST_DB_SCHEMAS: public,storage,graphql_public
-      PGRST_JWT_SECRET: ${JWT_SECRET}
-
   kong:
     image: kong:2.8.1
     restart: unless-stopped
@@ -100,7 +88,6 @@ services:
       KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-
   vector:
     image: timberio/vector:0.28.1-debian
     restart: unless-stopped
