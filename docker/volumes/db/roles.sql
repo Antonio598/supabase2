@@ -1,4 +1,4 @@
--- 1. Crear roles de forma segura
+-- Crear roles solo si no existen para evitar errores de duplicado
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticator') THEN
@@ -15,11 +15,11 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Asignar permisos básicos
+-- Asignar jerarquía
 GRANT anon TO authenticator;
 GRANT authenticated TO authenticator;
 GRANT service_role TO authenticator;
 
--- 3. Asegurar contraseñas
+-- Asegurar contraseñas
 ALTER ROLE authenticator WITH PASSWORD 'Synexia_Secure_Pass_2026!';
 ALTER ROLE postgres WITH PASSWORD 'Synexia_Secure_Pass_2026!';
