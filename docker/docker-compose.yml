@@ -30,7 +30,6 @@ services:
   kong:
     image: kong:2.8.1
     restart: unless-stopped
-    # Se eliminó la sección ports para evitar conflictos en Hostinger
     volumes:
       - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
@@ -112,7 +111,7 @@ services:
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
   logflare:
-    image: supabase/logflare:v1.4.0
+    image: supabase/logflare:latest # <--- CAMBIADO A LATEST
     restart: unless-stopped
     environment:
       LOGFLARE_NODE_ID: node-1
@@ -130,7 +129,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   analytics:
-    image: supabase/logflare:v1.4.0
+    image: supabase/logflare:latest # <--- CAMBIADO A LATEST
     restart: unless-stopped
     depends_on:
       vector:
