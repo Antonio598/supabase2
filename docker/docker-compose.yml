@@ -42,43 +42,6 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
 
-  studio:
-    image: supabase/studio:latest
-    restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      HOSTNAME: "0.0.0.0"
-      STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: postgres
-      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-      AUTH_JWT_SECRET: ${JWT_SECRET}
-      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
-    volumes:
-      - ./volumes/studio/snippets:/etc/studio/snippets
-
-  meta:
-    image: supabase/postgres-meta:v0.84.2
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PG_META_PORT: 8080
-      PG_META_DB_HOST: db
-      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      PG_META_DB_NAME: postgres
-      PG_META_DB_USER: postgres
-      PG_META_DB_SCHEMA: public
-      PG_META_DB_SSL: "false"
-
   auth:
     image: supabase/auth:v2.161.0
     restart: unless-stopped
@@ -104,3 +67,73 @@ services:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
+
+  realtime:
+    image: supabase/realtime:v2.33.51
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      REPLICATION_MODE: RLS
+
+  meta:
+    image: supabase/postgres-meta:v0.84.2
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+
+  studio:
+    image: supabase/studio:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOSTNAME: "0.0.0.0"
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+
+  # --- EL TRÍO DE ANALÍTICAS CON EL PARCHE ---
+  logflare:
+    image: supabase/logflare:v1.4.0
+    restart: unless-stopped
+    environment:
+      LOGFLARE_NODE_ID: node-1
+      LOGFLARE_SINGLE_TENANT: "true"
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  vector:
+    image: timberio/vector:0.28.1-debian
+    restart: unless-stopped
+    environment:
+      VECTOR_LOG: error  # <--- ESTO EVITA QUE TU SERVIDOR SE CONGELE
+    volumes:
+      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  analytics:
+    image: supabase/logflare:v1.4.0
+    restart: unless-stopped
+    depends_on:
+      vector:
+        condition: service_started
