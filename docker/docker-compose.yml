@@ -10,8 +10,7 @@ services:
   db:
     image: supabase/postgres:15.1.1.78
     restart: unless-stopped
-    ports:
-      - "5433:5432" # Redirección: 5433 hacia afuera, 5432 hacia adentro
+    # HEMOS QUITADO 'ports' PARA EVITAR CONFLICTOS EXTERNOS
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
       interval: 10s
@@ -19,13 +18,10 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      # Asegúrate de tener estos archivos en tu carpeta /volumes/db/ de GitHub
-      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # data_v14 garantiza un inicio limpio ignorando el conflicto anterior
-      - ./volumes/db/data_v14:/var/lib/postgresql/data 
+      - ./volumes/db/data_v15:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
