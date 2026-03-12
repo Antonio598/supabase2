@@ -7,24 +7,20 @@
 name: supabase
 
 services:
+
   db:
     image: supabase/postgres:15.1.1.78
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
-      interval: 10s
-      timeout: 10s
-      retries: 20
-      start_period: 60s
     volumes:
-      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
-      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
-      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # Forzamos data_v18 para que el sistema empiece desde cero absoluto
-      - ./volumes/db/data_v18:/var/lib/postgresql/data 
+      - ./volumes/db/data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD","pg_isready","-U","postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   meta:
     image: supabase/postgres-meta:v0.84.2
@@ -34,34 +30,20 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
-      PG_META_DB_SSL: "false"
+      PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
-  studio:
-    image: supabase/studio:latest # Usamos latest para que el Deploy no falle
+  rest:
+    image: postgrest/postgrest:v12.0.1
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-      meta:
-        condition: service_started
     environment:
-      HOSTNAME: "0.0.0.0"
-      STUDIO_PG_META_URL: http://meta:8080
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # ESTO ES LO QUE ARREGLA EL ERROR .includes()
-      SUPABASE_URL: http://kong:8000
-      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      AUTH_JWT_SECRET: ${JWT_SECRET}
-      # Variables de identidad (Obligatorias para self-hosted)
-      STUDIO_DEFAULT_ORGANIZATION: "Synexia AI"
-      STUDIO_DEFAULT_PROJECT: "Funnel Project"
-      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
-    volumes:
-      - ./volumes/studio/snippets:/etc/studio/snippets
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
 
   auth:
     image: supabase/auth:v2.161.0
@@ -73,26 +55,71 @@ services:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_JWT_SECRET: ${JWT_SECRET}
       GOTRUE_JWT_EXP: 3600
 
+  realtime:
+    image: supabase/realtime:v2.25.50
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      PORT: 4000
+      JWT_SECRET: ${JWT_SECRET}
+
+  storage:
+    image: supabase/storage-api:v0.40.4
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+
+  studio:
+    image: supabase/studio:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      meta:
+        condition: service_started
+    environment:
+      HOSTNAME: 0.0.0.0
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      EDGE_FUNCTIONS_MANAGEMENT_FOLDER: /tmp/functions
+      STUDIO_DEFAULT_ORGANIZATION: "Default Org"
+      STUDIO_DEFAULT_PROJECT: "Default Project"
+
   kong:
     image: kong:2.8.1
     restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "8443:8443"
     volumes:
-      - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
+      - ./volumes/api/kong.yml:/home/kong/kong.yml
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
-  vector:
-    image: timberio/vector:0.28.1-debian
-    restart: unless-stopped
-    environment:
-      VECTOR_LOG: error
-    volumes:
-      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
