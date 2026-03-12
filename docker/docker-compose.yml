@@ -110,16 +110,13 @@ services:
       STUDIO_DEFAULT_ORGANIZATION: "Default Org"
       STUDIO_DEFAULT_PROJECT: "Default Project"
 
-  kong:
-    image: kong:2.8.1
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-      - "8443:8443"
-    volumes:
-      - ./volumes/api/kong.yml:/home/kong/kong.yml
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+ kong:
+  image: kong:2.8.1
+  restart: unless-stopped
+  volumes:
+    - ./volumes/api/kong.yml:/home/kong/kong.yml
+  environment:
+    KONG_DATABASE: "off"
+    KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+    SUPABASE_ANON_KEY: ${ANON_KEY}
+    SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
