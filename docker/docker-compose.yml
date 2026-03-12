@@ -21,7 +21,7 @@ services:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/00-realtime.sql
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/01-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/02-jwt.sql
-      - ./volumes/db/schema.sql:/docker-entrypoint-initdb.d/03-schema.sql
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
       - ./volumes/db/data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -94,7 +94,7 @@ services:
       PG_META_DB_NAME: postgres
       PG_META_DB_USER: postgres
       PG_META_DB_PORT: 5432
-      PG_META_DB_SSL: "false" # <-- Esto arregla el error de comunicación API
+      PG_META_DB_SSL: "false"
 
   studio:
     image: supabase/studio:latest
