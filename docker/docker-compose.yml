@@ -30,8 +30,7 @@ services:
   kong:
     image: kong:2.8.1
     restart: unless-stopped
-    ports:
-      - ${KONG_HTTP_PORT:-8000}:8000
+    # Se eliminó la sección ports para evitar conflictos en Hostinger
     volumes:
       - ./volumes/api/kong.yml:/home/kong/kong.yml:ro
     environment:
@@ -112,7 +111,6 @@ services:
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
-  # --- EL TRÍO DE ANALÍTICAS CON EL PARCHE ---
   logflare:
     image: supabase/logflare:v1.4.0
     restart: unless-stopped
@@ -126,7 +124,7 @@ services:
     image: timberio/vector:0.28.1-debian
     restart: unless-stopped
     environment:
-      VECTOR_LOG: error  # <--- ESTO EVITA QUE TU SERVIDOR SE CONGELE
+      VECTOR_LOG: error
     volumes:
       - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
