@@ -18,13 +18,12 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      # ORDEN CRÍTICO: Roles primero, luego esquema
       - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # Carpeta nueva para ignorar errores pasados
-      - ./volumes/db/data_v9:/var/lib/postgresql/data 
+      # Cambiamos a data_v11 para asegurar una instalación limpia de 0
+      - ./volumes/db/data_v11:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -37,11 +36,8 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: db
-      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      PG_META_DB_NAME: postgres
-      PG_META_DB_USER: postgres
-      PG_META_DB_PORT: 5432
+      # Conexión directa para evitar fallos de resolución de DNS internos
+      PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PG_META_DB_SSL: "false"
 
   studio:
@@ -61,9 +57,6 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
-      SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
-    volumes:
-      - ./volumes/studio/snippets:/etc/studio/snippets
 
   kong:
     image: kong:2.8.1
