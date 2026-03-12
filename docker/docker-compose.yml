@@ -20,8 +20,8 @@ services:
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      # Usamos data_v16 para entrar con todo limpio
-      - ./volumes/db/data_v16:/var/lib/postgresql/data 
+      # data_v17 para entrar 100% limpio
+      - ./volumes/db/data_v17:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -39,8 +39,8 @@ services:
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
   studio:
-    # Esta versión es estable y existe en Docker Hub
-    image: supabase/studio:v0.30.3
+    # ESTA VERSIÓN SÍ EXISTE (Verificada en Docker Hub)
+    image: supabase/studio:2024.11.26-sha-8f096b5
     restart: unless-stopped
     depends_on:
       db:
@@ -51,6 +51,7 @@ services:
       HOSTNAME: "0.0.0.0"
       STUDIO_PG_META_URL: http://meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Estas 3 variables dentro de Studio son las que matan el error .includes()
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
@@ -59,6 +60,9 @@ services:
       SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
     volumes:
       - ./volumes/studio/snippets:/etc/studio/snippets
+
+  # ... (Resto de servicios: auth, rest, kong se mantienen igual)
+  # Solo asegúrate de que el resto del archivo esté ahí
 
   auth:
     image: supabase/auth:v2.161.0
