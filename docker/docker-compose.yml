@@ -10,6 +10,8 @@ services:
   db:
     image: supabase/postgres:15.1.1.78
     restart: unless-stopped
+    ports:
+      - "5433:5432" # Redirección: 5433 hacia afuera, 5432 hacia adentro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
       interval: 10s
@@ -17,12 +19,13 @@ services:
       retries: 20
       start_period: 60s
     volumes:
-      # Mapeos optimizados: dejamos que el esquema principal corra primero
-      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/00-schema.sql
+      # Asegúrate de tener estos archivos en tu carpeta /volumes/db/ de GitHub
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/00-roles.sql
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
-      # data_v13 asegura que tu servidor de 16GB haga una instalación limpia
-      - ./volumes/db/data_v13:/var/lib/postgresql/data 
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
+      # data_v14 garantiza un inicio limpio ignorando el conflicto anterior
+      - ./volumes/db/data_v14:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -35,7 +38,7 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      # Conexión por URL: es la forma más estable de evitar el error 'undefined'
+      # Conexión interna: usa el nombre del servicio 'db' y el puerto interno 5432
       PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
       PG_META_DB_SSL: "false"
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
@@ -83,6 +86,21 @@ services:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: public,storage,graphql_public
       PGRST_JWT_SECRET: ${JWT_SECRET}
+
+  realtime:
+    image: supabase/realtime:v2.33.51
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      REPLICATION_MODE: RLS
 
   kong:
     image: kong:2.8.1
