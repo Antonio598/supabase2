@@ -10,7 +10,6 @@ services:
   db:
     image: supabase/postgres:15.1.1.78
     restart: unless-stopped
-    # HEMOS QUITADO 'ports' PARA EVITAR CONFLICTOS EXTERNOS
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
       interval: 10s
@@ -21,7 +20,8 @@ services:
       - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/01-jwt.sql
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/02-realtime.sql
       - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/03-schema.sql
-      - ./volumes/db/data_v15:/var/lib/postgresql/data 
+      # Usamos data_v16 para entrar con todo limpio
+      - ./volumes/db/data_v16:/var/lib/postgresql/data 
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres
@@ -34,14 +34,13 @@ services:
         condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      # Conexión interna: usa el nombre del servicio 'db' y el puerto interno 5432
       PG_META_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres?sslmode=disable
       PG_META_DB_SSL: "false"
       PG_META_CRYPTO_KEY: ${JWT_SECRET}
 
   studio:
-    # Cambiamos 'latest' por esta versión específica y estable
-    image: supabase/studio:2024.11.26-sha-8f096b5
+    # Esta versión es estable y existe en Docker Hub
+    image: supabase/studio:v0.30.3
     restart: unless-stopped
     depends_on:
       db:
@@ -55,11 +54,12 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
       SNIPPETS_MANAGEMENT_FOLDER: /etc/studio/snippets
     volumes:
       - ./volumes/studio/snippets:/etc/studio/snippets
+
   auth:
     image: supabase/auth:v2.161.0
     restart: unless-stopped
@@ -85,21 +85,6 @@ services:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
       PGRST_DB_SCHEMAS: public,storage,graphql_public
       PGRST_JWT_SECRET: ${JWT_SECRET}
-
-  realtime:
-    image: supabase/realtime:v2.33.51
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: postgres
-      DB_USER: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      REPLICATION_MODE: RLS
 
   kong:
     image: kong:2.8.1
